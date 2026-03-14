@@ -30,8 +30,8 @@ alwaysApply: true
 
 ## Test Data
 
-- `tests/data/`: Include both English (sample1.mp3) and Japanese (サンプル1.wav) filenames
-- Regenerate with `./tests/setup-testdata.sh` (no source = synthetic, no external dependency)
+- `tests/data/`: Pre-created speech files. `tests/data/expected/` has actual output samples by format (srt/, txt/, vtt/, plain/)
+- Regenerate synthetic with `./tests/setup-testdata.sh` (no source = ffmpeg synthetic, no external dependency)
 
 ## Script Conventions
 

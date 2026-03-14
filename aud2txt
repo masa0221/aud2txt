@@ -18,6 +18,9 @@ fi
 recursive=1
 dst="outputs"
 dst_specified=0
+output_format="srt"
+plain_text=0
+whisper_model=""
 
 # Option parsing
 while [[ $# -gt 0 ]]; do
@@ -35,6 +38,25 @@ while [[ $# -gt 0 ]]; do
       dst_specified=1
       shift 2
       ;;
+    -f|--format)
+      case "$2" in
+        srt|txt|vtt) output_format="$2" ;;
+        *)
+          echo -e "${R}Error: Invalid format: $2${X}"
+          echo "  Use srt, txt, or vtt"
+          exit 1
+          ;;
+      esac
+      shift 2
+      ;;
+    --plain)
+      plain_text=1
+      shift
+      ;;
+    -m|--model)
+      whisper_model="$2"
+      shift 2
+      ;;
     -h|--help)
       echo "Usage: $0 [options] input(file|directory) [output_directory]"
       echo ""
@@ -42,12 +64,27 @@ while [[ $# -gt 0 ]]; do
       echo "  -r, --recursive       Recursive search in directory (default)"
       echo "  -R, --no-recursive     Top-level only"
       echo "  -o, --output DIR      Output directory"
+      echo "  -f, --format FMT      Output format: srt, txt, vtt (default: srt)"
+      echo "  -m, --model NAME      Whisper model: tiny, base, small, medium, large-v3, turbo (default: turbo)"
+      echo "  --plain               Plain text without timestamps (txt format only)"
       echo "  -h, --help            Show this help"
       echo ""
+      echo "Model reference (quality vs speed):"
+      echo "  tiny      Fastest, lowest accuracy. ~1GB RAM."
+      echo "  base      Fast, low accuracy. ~1GB RAM."
+      echo "  small     Balanced. ~2GB RAM."
+      echo "  medium    Better accuracy, slower. ~5GB RAM."
+      echo "  large-v3  Best accuracy, slowest. ~10GB RAM."
+      echo "  turbo     Default. Good balance (openai-whisper)."
+      echo ""
+      echo "Recommended: whisper-ctranslate2 (4x faster than openai-whisper). Same CLI."
+      echo ""
       echo "Examples:"
-      echo "  $0 audio.mp3                    # Single file, output to outputs/"
-      echo "  $0 ./audios                    # Directory (recursive)"
-      echo "  $0 -R -o out ./audios          # No recursive, output to out/"
+      echo "  $0 audio.mp3                    # Single file, SRT to outputs/"
+      echo "  $0 -m small audio.mp3           # Use small model (balanced)"
+      echo "  $0 -m large-v3 audio.mp3        # Best quality, slower"
+      echo "  $0 -f txt --plain audio.mp3    # Plain text without timestamps"
+      echo "  $0 -R -o out ./audios          # Top-level only, output to out/"
       exit 0
       ;;
     -*)
@@ -69,6 +106,11 @@ fi
 if [[ -z "$input" ]]; then
   echo "Usage: $0 [options] input(file|directory) [output_directory]"
   echo "  Use -h for help"
+  exit 1
+fi
+
+if [[ $plain_text -eq 1 && "$output_format" != "txt" ]]; then
+  echo -e "${R}Error: --plain only applies to txt format${X}"
   exit 1
 fi
 
@@ -136,7 +178,7 @@ transcribe_one() {
 
   rel="${f#$src_base/}"
   rel="${rel#/}"
-  out="$dst/${rel%.*}.txt"
+  out="$dst/${rel%.*}.${output_format}"
   mkdir -p "$(dirname "$out")"
 
   if [[ -f "$out" ]]; then
@@ -150,23 +192,36 @@ transcribe_one() {
   : > "$errfile"
 
   if [[ $WHISPER_AVAILABLE -eq 1 ]]; then
-    # Use Whisper CLI (openai-whisper): outputs to --output_dir with base.txt
-    local tmpdir base
+    # Use Whisper CLI (openai-whisper or whisper-ctranslate2): outputs to --output_dir
+    local tmpdir base wout whisper_args
     tmpdir="$(mktemp -d)"
     base="$(basename "$f" | sed 's/\.[^.]*$//')"
-    if whisper "$f" --output_dir "$tmpdir" --output_format txt </dev/null >>"$errfile" 2>&1; then
-      if [[ -f "$tmpdir/${base}.txt" ]]; then
-        mv "$tmpdir/${base}.txt" "$out"
+    whisper_args=("$f" --output_dir "$tmpdir" --output_format "$output_format")
+    [[ -n "$whisper_model" ]] && whisper_args+=(--model "$whisper_model")
+    if whisper "${whisper_args[@]}" </dev/null >>"$errfile" 2>&1; then
+      wout="$tmpdir/${base}.${output_format}"
+      if [[ -f "$wout" ]]; then
+        if [[ $plain_text -eq 1 && "$output_format" == "txt" ]]; then
+          sed 's/^\[[^]]*\] //' "$wout" > "$out"
+        else
+          mv "$wout" "$out"
+        fi
       else
-        local txtfile
-        txtfile="$(find "$tmpdir" -name "*.txt" -type f | head -1)"
-        [[ -n "$txtfile" && -f "$txtfile" ]] && mv "$txtfile" "$out"
+        local outfile
+        outfile="$(find "$tmpdir" -name "*.${output_format}" -type f | head -1)"
+        if [[ -n "$outfile" && -f "$outfile" ]]; then
+          if [[ $plain_text -eq 1 && "$output_format" == "txt" ]]; then
+            sed 's/^\[[^]]*\] //' "$outfile" > "$out"
+          else
+            mv "$outfile" "$out"
+          fi
+        fi
       fi
     fi
     rm -rf "$tmpdir"
   else
-    # Placeholder: create .txt with note (for structure testing / CI)
-    echo "[Placeholder] Install Whisper for transcription: pip install openai-whisper" > "$out"
+    # Placeholder: create file with note (for structure testing / CI)
+    echo "[Placeholder] Install Whisper for transcription: uv tool install whisper-ctranslate2 (or pip install whisper-ctranslate2)" > "$out"
   fi
 
   if [[ -f "$out" ]]; then
