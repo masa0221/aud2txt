@@ -13,13 +13,13 @@ brew install masa0221/tap/aud2txt
 Requires:
 
 - ffmpeg: `brew install ffmpeg`
-- Whisper (for actual transcription): `pip install openai-whisper`
+- Whisper (for actual transcription): `uv tool install openai-whisper` or `pip install openai-whisper`
 
 ## Requirements
 
 - bash
 - ffmpeg
-- whisper (optional; install via `pip install openai-whisper` for transcription)
+- whisper (optional; install via `uv tool install openai-whisper` or `pip install openai-whisper` for transcription)
 
 ## Docker
 

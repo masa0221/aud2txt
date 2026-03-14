@@ -13,13 +13,13 @@ brew install masa0221/tap/aud2txt
 必要環境:
 
 - ffmpeg: `brew install ffmpeg`
-- Whisper（実際の文字起こし用）: `pip install openai-whisper`
+- Whisper（実際の文字起こし用）: `uv tool install openai-whisper` または `pip install openai-whisper`
 
 ## 要件
 
 - bash
 - ffmpeg
-- whisper（任意。文字起こしには `pip install openai-whisper` でインストール）
+- whisper（任意。文字起こしには `uv tool install openai-whisper` または `pip install openai-whisper` でインストール）
 
 ## Docker
 

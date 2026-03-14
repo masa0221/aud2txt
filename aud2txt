@@ -166,7 +166,7 @@ transcribe_one() {
     rm -rf "$tmpdir"
   else
     # Placeholder: create .txt with note (for structure testing / CI)
-    echo "[Placeholder] Install Whisper for transcription: pip install openai-whisper" > "$out"
+    echo "[Placeholder] Install Whisper for transcription: uv tool install openai-whisper (or pip install openai-whisper)" > "$out"
   fi
 
   if [[ -f "$out" ]]; then
