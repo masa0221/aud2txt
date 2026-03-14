@@ -2,6 +2,9 @@
 # Create short audio clips for testing
 # No source: generate synthetic audio with ffmpeg (no external dependency)
 # With source: extract first N seconds from existing audio/video
+#
+# Test data in tests/data/ is pre-created (speech) for content verification.
+# Run this script only to regenerate synthetic data when needed.
 
 set -u
 

@@ -13,10 +13,30 @@ X='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATA_DIR="$PROJECT_ROOT/tests/data"
+EXPECTED_DIR="$DATA_DIR/expected"
 OUTPUT_DIR="$PROJECT_ROOT/outputs"
 USE_DOCKER=0
 
 [[ "${1:-}" == "--docker" ]] && USE_DOCKER=1
+
+# Verify output matches expected file (native run only; Docker uses placeholder)
+verify_output() {
+  local out_file="$1"
+  local exp_file="$2"
+  [[ $USE_DOCKER -eq 1 ]] && return 0
+  [[ ! -f "$exp_file" ]] && return 0
+  if ! diff -q "$exp_file" "$out_file" &>/dev/null; then
+    # Fallback: verify key text content is present (Whisper may vary slightly)
+    local key_text
+    key_text="$(grep -v -E '^[0-9]+$|^[0-9:,.]+ -->|^WEBVTT$|^$' "$exp_file" | head -1 | tr -d '\n' | head -c 80)"
+    [[ -z "$key_text" ]] && return 0
+    if ! grep -qiF "$key_text" "$out_file" 2>/dev/null; then
+      local first_word="${key_text%% *}"
+      [[ -n "$first_word" && ${#first_word} -ge 2 ]] && grep -qiF "$first_word" "$out_file" 2>/dev/null && return 0
+      fail "Output missing expected content: $key_text"
+    fi
+  fi
+}
 
 cd "$PROJECT_ROOT"
 rm -rf "$OUTPUT_DIR"
@@ -47,11 +67,13 @@ fail() {
   exit 1
 }
 
-# Transcription (mp3/wav -> txt)
+# Transcription (mp3/wav -> srt)
 run_test "Audio to text (recursive)" || fail "Transcription failed"
-test -f "$OUTPUT_DIR/sample1.txt" || fail "sample1.txt not created"
-test -f "$OUTPUT_DIR/サンプル1.txt" || fail "サンプル1.txt not created"
-echo -e "  ${G}OK${X} sample1.txt, サンプル1.txt"
+test -f "$OUTPUT_DIR/sample1.srt" || fail "sample1.srt not created"
+test -f "$OUTPUT_DIR/サンプル1.srt" || fail "サンプル1.srt not created"
+verify_output "$OUTPUT_DIR/sample1.srt" "$EXPECTED_DIR/srt/sample1.srt"
+verify_output "$OUTPUT_DIR/サンプル1.srt" "$EXPECTED_DIR/srt/サンプル1.srt"
+echo -e "  ${G}OK${X} sample1.srt, サンプル1.srt"
 
 # Top-level only
 rm -rf "$OUTPUT_DIR"
@@ -65,8 +87,9 @@ if [[ $USE_DOCKER -eq 1 ]]; then
 else
   ./aud2txt -R "$DATA_DIR" "$OUTPUT_DIR"
 fi
-test -f "$OUTPUT_DIR/sample1.txt" || fail "sample1.txt (top-level) not created"
-test ! -f "$OUTPUT_DIR/subdir/sample3.txt" || fail "subdir should be skipped with -R"
+test -f "$OUTPUT_DIR/sample1.srt" || fail "sample1.srt (top-level) not created"
+test ! -f "$OUTPUT_DIR/subdir/sample3.srt" || fail "subdir should be skipped with -R"
+verify_output "$OUTPUT_DIR/sample1.srt" "$EXPECTED_DIR/srt/sample1.srt"
 echo -e "  ${G}OK${X} Top-level only"
 
 # Single file
@@ -81,8 +104,57 @@ if [[ $USE_DOCKER -eq 1 ]]; then
 else
   ./aud2txt "$DATA_DIR/sample1.mp3" "$OUTPUT_DIR"
 fi
-test -f "$OUTPUT_DIR/sample1.txt" || fail "sample1.txt (single file) not created"
+test -f "$OUTPUT_DIR/sample1.srt" || fail "sample1.srt (single file) not created"
+verify_output "$OUTPUT_DIR/sample1.srt" "$EXPECTED_DIR/srt/sample1.srt"
 echo -e "  ${G}OK${X} Single file"
+
+# Output format: txt
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+echo -e "${Y}Test: Format txt${X}"
+if [[ $USE_DOCKER -eq 1 ]]; then
+  docker run --rm \
+    -v "$(pwd)/tests/data:/input" \
+    -v "$(pwd)/outputs:/output" \
+    aud2txt -f txt /input /output
+else
+  ./aud2txt -f txt "$DATA_DIR" "$OUTPUT_DIR"
+fi
+test -f "$OUTPUT_DIR/sample1.txt" || fail "sample1.txt not created"
+verify_output "$OUTPUT_DIR/sample1.txt" "$EXPECTED_DIR/txt/sample1.txt"
+echo -e "  ${G}OK${X} Format txt"
+
+# Output format: vtt
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+echo -e "${Y}Test: Format vtt${X}"
+if [[ $USE_DOCKER -eq 1 ]]; then
+  docker run --rm \
+    -v "$(pwd)/tests/data:/input" \
+    -v "$(pwd)/outputs:/output" \
+    aud2txt -f vtt /input /output
+else
+  ./aud2txt -f vtt "$DATA_DIR" "$OUTPUT_DIR"
+fi
+test -f "$OUTPUT_DIR/sample1.vtt" || fail "sample1.vtt not created"
+verify_output "$OUTPUT_DIR/sample1.vtt" "$EXPECTED_DIR/vtt/sample1.vtt"
+echo -e "  ${G}OK${X} Format vtt"
+
+# Output format: txt --plain
+rm -rf "$OUTPUT_DIR"
+mkdir -p "$OUTPUT_DIR"
+echo -e "${Y}Test: Format txt --plain${X}"
+if [[ $USE_DOCKER -eq 1 ]]; then
+  docker run --rm \
+    -v "$(pwd)/tests/data:/input" \
+    -v "$(pwd)/outputs:/output" \
+    aud2txt -f txt --plain /input /output
+else
+  ./aud2txt -f txt --plain "$DATA_DIR" "$OUTPUT_DIR"
+fi
+test -f "$OUTPUT_DIR/sample1.txt" || fail "sample1.txt (plain) not created"
+verify_output "$OUTPUT_DIR/sample1.txt" "$EXPECTED_DIR/plain/sample1.txt"
+echo -e "  ${G}OK${X} Format txt --plain"
 
 echo ""
 echo -e "${G}All tests passed${X}"

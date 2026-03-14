@@ -4,6 +4,9 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
+    python3 \
+    python3-pip \
+    && pip3 install --no-cache-dir --break-system-packages whisper-ctranslate2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
