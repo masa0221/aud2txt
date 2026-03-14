@@ -1,0 +1,37 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create test data
+        run: ./tests/setup-testdata.sh
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: aud2txt:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run aud2txt (Docker)
+        run: |
+          docker run --rm \
+            -v "$(pwd)/tests/data:/input" \
+            -v "$(pwd)/outputs:/output" \
+            aud2txt /input /output
+          test -d outputs
+          test -f outputs/sample1.txt

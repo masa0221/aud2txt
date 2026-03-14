@@ -1,0 +1,62 @@
+---
+description: aud2txt project conventions and context
+alwaysApply: true
+---
+
+# aud2txt Project Conventions
+
+## Structure
+
+- **Root**: Tool only (aud2txt, Dockerfile, etc.)
+- **tests/**: Test-related (setup-testdata.sh, data/)
+- **outputs/**: All output goes here (gitignored)
+
+## Language
+
+- Script output and messages: **English only**
+- Comments in code: English
+
+## Output
+
+- Native and Docker: output to `outputs/` (gitignored)
+- Test runs: always use `outputs/` for output
+- Docker: `-v "$(pwd)/outputs:/output"`
+
+## Docker
+
+- No helper scripts (e.g. docker-run.sh)
+- Use `docker build` and `docker run` directly
+- Simple over easy
+
+## Test Data
+
+- `tests/data/`: Include both English (sample1.mp3) and Japanese (サンプル1.wav) filenames
+- Regenerate with `./tests/setup-testdata.sh` (no source = synthetic, no external dependency)
+
+## Script Conventions
+
+- Options over env vars (e.g. `-R` not env)
+- Check required commands (ffmpeg) at start, exit with error if missing
+- Colored output when stdout is TTY
+
+## Markdown
+
+- Before commit: run `npx markdownlint-cli2 "**/*.md"` and fix issues (e.g. MD022: headings need blank lines)
+
+## README
+
+- README.md (English) is the primary
+- README.ja.md (Japanese) must be kept in sync
+- When modifying README.md, update README.ja.md with the same changes
+
+## Development Workflow
+
+When adding features or changes, **always start from latest main** — sync first, then create a branch. Do not work directly on main.
+
+1. **Sync main first**: `git checkout main && git pull`
+2. **Create branch**: `git checkout -b feature/xxx` or `fix/xxx`
+3. Implement and test locally
+4. Commit, push, and create PR (use `/pr` skill)
+5. Merge via PR — **never push directly to main**
+6. CI (GitHub Actions) runs on PR
+7. **After merge**: Release — tag, GitHub release, update [homebrew-tap](https://github.com/masa0221/homebrew-tap) (use `/release` skill)
